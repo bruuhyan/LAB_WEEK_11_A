@@ -1,0 +1,56 @@
+1) Yang menangani penyimpanan file berdasarkan URI adalah method insertImageToStore() dan insertToStore() pada ProviderFileManager.kt:
+
+fun insertImageToStore(fileInfo: FileInfo?) {
+    fileInfo?.let {
+        insertToStore(
+            fileInfo,
+            mediaContentHelper.getImageContentUri(),
+            mediaContentHelper.generateImageContentValues(it)
+        )
+    }
+}
+
+private fun insertToStore(
+    fileInfo: FileInfo,
+    contentUri: Uri,
+    contentValues: ContentValues
+) {
+    executor.execute {
+        val insertedUri = contentResolver.insert(contentUri, contentValues)
+        insertedUri?.let {
+            val inputStream = contentResolver.openInputStream(fileInfo.uri)
+            val outputStream = contentResolver.openOutputStream(insertedUri)
+            IOUtils.copy(inputStream, outputStream)
+        }
+    }
+}
+
+2) Uri = tempat penyimpanan sementara untuk menyimpan foto/video sebelum dimasukan ke MediaStore
+   relativePath = folder tujuan di MediaStore tempat file yang akan disimpan secara permanen
+
+3) Kronologinya:
+- User tekan tombol foto
+openImageCapture()
+
+- Aplikasi menghasilkan URI sementara ->
+val uri = fileHelper.getUriFromFile(file)
+return FileInfo(uri, file, ...)
+
+- Kamera dibuka dengan ActivityResultLauncher
+takePictureLauncher.launch(photoInfo.uri)
+
+- foto selesai diambil, callback dipanggil
+providerFileManager.insertImageToStore(photoInfo)
+
+- metadata disiapkan
+generateImageContentValues(fileInfo)
+
+- File dimasukan ke MediaStore
+contentResolver.inser(contentUri, contentValues)
+
+- Copy data dari file sementara ke MediaStore
+val inputStream = contentResolver.openInputStream(fileInfo.uri)
+val outputStream = contentResolver.openOutputStream(insertedUri)
+IOUtils.copy(inputStream, outputStream)
+
+- File tersimpan di MediaStore (gallery, file manager, MediaStore database)
